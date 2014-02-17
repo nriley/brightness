@@ -130,14 +130,17 @@ int main(int argc, char * const argv[]) {
                  CGDisplayModeGetPixelWidth(mode),
                  CGDisplayModeGetPixelHeight(mode));
         }
-        CGSize size = CGDisplayScreenSize(dspy);
         printf(" @ %.1f Hz",
                CGDisplayModeGetRefreshRate(mode));
         printf(", origin (%.0f, %.0f)\n",
                bounds.origin.x, bounds.origin.y);
-        printf("\tphysical size %.0f x %.0f mm\n",
+        CGSize size = CGDisplayScreenSize(dspy);
+        printf("\tphysical size %.0f x %.0f mm",
                size.width, size.height);
-        printf("\tIOKit flags 0x%x",
+        double rotation = CGDisplayRotation(dspy);
+        if (rotation)
+          printf(", rotated %.0f°", rotation);
+        printf("\n\tIOKit flags 0x%x",
                CGDisplayModeGetIOFlags(mode));
         printf("; IOKit display mode ID 0x%x\n",
                CGDisplayModeGetIODisplayModeID(mode));
@@ -148,8 +151,6 @@ int main(int argc, char * const argv[]) {
                                        CFStringGetFastestEncoding(pixelEncoding)));
           CFRelease(pixelEncoding);
         }
-        CGSize mmSize = CGDisplayScreenSize(dspy);
-        double rotation = CGDisplayRotation(dspy);
         if (CGDisplayIsInMirrorSet(dspy)) {
           CGDirectDisplayID mirrorsDisplay = CGDisplayMirrorsDisplay(dspy);
           if (mirrorsDisplay == kCGNullDirectDisplay)
