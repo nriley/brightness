@@ -130,7 +130,7 @@ int main(int argc, char * const argv[]) {
 				       brightness);
       if (err != kIOReturnSuccess) {
 	fprintf(stderr,
-		"%s: failed to set brightness of display 0x%x (error %d)",
+		"%s: failed to set brightness of display 0x%x (error %d)\n",
 		APP_NAME, (unsigned int)dspy, err);
 	continue;
       }
@@ -140,7 +140,7 @@ int main(int argc, char * const argv[]) {
 				       &brightness);
       if (err != kIOReturnSuccess) {
 	fprintf(stderr,
-		"%s: failed to get brightness of display 0x%x (error %d)",
+		"%s: failed to get brightness of display 0x%x (error %d)\n",
 		APP_NAME, (unsigned int)dspy, err);
 	continue;
       }
