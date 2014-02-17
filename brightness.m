@@ -1,4 +1,13 @@
-/* gcc -std=c99 -o brightness -framework Cocoa -framework DisplayServices -F/System/Library/PrivateFrameworks brightness.m */
+/* clang -o brightness -framework Cocoa -framework DisplayServices -F/System/Library/PrivateFrameworks -Wl,-U,_CGDisplayModeGetPixelWidth -Wl,-U,_CGDisplayModeGetPixelHeight -mmacosx-version-min=10.6 brightness.m
+
+   Does not compile with OS X 10.8 or newer SDK.
+
+   For the 10.6 SDK, compile with -isysroot /path/to/MacOSX10.6.sdk.
+
+   For the 10.7 SDK, compile with -arch i386 -isysroot /path/to/MacOSX10.7.sdk.
+   (x86_64 will compile but crashes.)
+*/
+
 
 #import <Foundation/Foundation.h>
 #include <crt_externs.h>
@@ -17,6 +26,12 @@
 - (void)bumpBrightnessUp;
 - (void)bumpBrightnessDown;
 @end
+
+/* 10.8+ */
+extern size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef mode)
+  __attribute__((weak_import));
+extern size_t CGDisplayModeGetPixelHeight(CGDisplayModeRef mode)
+  __attribute__((weak_import));
 
 const int kMaxDisplays = 16;
 
@@ -40,7 +55,7 @@ void usage() {
 int main(int argc, char * const argv[]) {
   if (argc == 1)
     usage();
-  
+
   BOOL verbose = NO;
   unsigned long displayToSet = 0;
   enum { ACTION_LIST, ACTION_SET_ALL, ACTION_SET_ONE } action = ACTION_SET_ALL;
@@ -73,7 +88,7 @@ int main(int argc, char * const argv[]) {
     default: usage();
     }
   }
-  
+
   argc -= optind;
   argv += optind;
 
@@ -103,21 +118,67 @@ int main(int argc, char * const argv[]) {
 
   for (CGDisplayCount i = 0; i < numDisplays; ++i) {
     CGDirectDisplayID dspy = display[i];
-    CFDictionaryRef originalMode = CGDisplayCurrentMode(dspy);
-    if (originalMode == NULL)
+    CGDisplayModeRef mode = CGDisplayCopyDisplayMode(dspy);
+    if (mode == NULL)
       continue;
 
     if (action == ACTION_LIST) {
       printf("display %d: ", i);
-      if (CGMainDisplayID() == dspy)
-	printf("main display, ");
-      printf("ID 0x%x\n", (unsigned int)dspy);
+      if (CGDisplayIsMain(dspy))
+	printf("main, ");
+      printf("%sactive, %s, %sline, %s%s",
+             CGDisplayIsActive(dspy) ? "" : "in",
+             CGDisplayIsAsleep(dspy) ? "asleep" : "awake",
+             CGDisplayIsOnline(dspy) ? "on" : "off",
+             CGDisplayIsBuiltin(dspy) ? "built-in" : "external",
+             CGDisplayIsStereo(dspy) ? ", stereo" : "");
+      printf(", ID 0x%x\n", (unsigned int)dspy);
       if (verbose) {
-        puts([[(NSDictionary *)originalMode description] UTF8String]);
+        CGRect bounds = CGDisplayBounds(dspy);
+        printf("\tresolution %.0f x %.0f pt",
+               bounds.size.width, bounds.size.height);
+        if (CGDisplayModeGetPixelWidth != NULL) {
+          printf(" (%zu x %zu px)",
+                 CGDisplayModeGetPixelWidth(mode),
+                 CGDisplayModeGetPixelHeight(mode));
+        }
+        CGSize size = CGDisplayScreenSize(dspy);
+        printf(" @ %.1f Hz",
+               CGDisplayModeGetRefreshRate(mode));
+        printf(", origin (%.0f, %.0f)\n",
+               bounds.origin.x, bounds.origin.y);
+        printf("\tphysical size %.0f x %.0f mm\n",
+               size.width, size.height);
+        printf("\tIOKit flags 0x%x",
+               CGDisplayModeGetIOFlags(mode));
+        printf("; IOKit display mode ID 0x%x\n",
+               CGDisplayModeGetIODisplayModeID(mode));
+        CFStringRef pixelEncoding = CGDisplayModeCopyPixelEncoding(mode);
+        if (pixelEncoding != NULL) {
+          printf("\tpixel encoding %s\n",
+                 CFStringGetCStringPtr(pixelEncoding,
+                                       CFStringGetFastestEncoding(pixelEncoding)));
+          CFRelease(pixelEncoding);
+        }
+        CGSize mmSize = CGDisplayScreenSize(dspy);
+        double rotation = CGDisplayRotation(dspy);
+        if (CGDisplayIsInMirrorSet(dspy)) {
+          CGDirectDisplayID mirrorsDisplay = CGDisplayMirrorsDisplay(dspy);
+          if (mirrorsDisplay == kCGNullDirectDisplay)
+            printf("\tmirrored\n");
+          else
+            printf("\tmirrors display ID 0x%x\n", mirrorsDisplay);
+        }
+        printf("\t%susable for desktop GUI%s\n",
+               CGDisplayModeIsUsableForDesktopGUI(mode) ? "" : "not ",
+               CGDisplayUsesOpenGLAcceleration(dspy) ?
+               ", uses OpenGL acceleration" : "");
       }
     }
 
-    if ([[(NSDictionary *)originalMode objectForKey: @"RefreshRate"] intValue] != 0)
+    float refreshRate = CGDisplayModeGetRefreshRate(mode);
+    CGDisplayModeRelease(mode);
+    if (refreshRate != 0)
       continue;
 
     id<BrightnessEngineWireProtocol> engine =

@@ -1,9 +1,15 @@
-/* gcc -std=c99 -o brightness brightness.c -framework IOKit -framework ApplicationServices */
+/* clang -o brightness brightness.c -framework IOKit -framework ApplicationServices -Wl,-U,_CGDisplayModeGetPixelWidth -Wl,-U,_CGDisplayModeGetPixelHeight -mmacosx-version-min=10.6 */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <IOKit/graphics/IOGraphicsLib.h>
 #include <ApplicationServices/ApplicationServices.h>
+
+/* 10.8+ */
+extern size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef mode)
+  __attribute__((weak_import));
+extern size_t CGDisplayModeGetPixelHeight(CGDisplayModeRef mode)
+  __attribute__((weak_import));
 
 const int kMaxDisplays = 16;
 const CFStringRef kDisplayBrightness = CFSTR(kIODisplayBrightnessKey);
@@ -61,7 +67,7 @@ int main(int argc, char * const argv[]) {
     default: usage();
     }
   }
-  
+
   argc -= optind;
   argv += optind;
 
@@ -96,30 +102,71 @@ int main(int argc, char * const argv[]) {
       errexit("cannot create CFWriteStream for /dev/stdout");
     if (!CFWriteStreamOpen(stdoutStream))
       errexit("cannot open CFWriteStream for /dev/stdout");
-  }								  
+  }
 
   for (CGDisplayCount i = 0; i < numDisplays; ++i) {
     CGDirectDisplayID dspy = display[i];
-    CFDictionaryRef originalMode = CGDisplayCurrentMode(dspy);
-    if (originalMode == NULL)
+    CGDisplayModeRef mode = CGDisplayCopyDisplayMode(dspy);
+    if (mode == NULL)
       continue;
 
     if (action == ACTION_LIST) {
       printf("display %d: ", i);
-      if (CGMainDisplayID() == dspy)
-	printf("main display, ");
-      printf("ID 0x%x\n", (unsigned int)dspy);
+      if (CGDisplayIsMain(dspy))
+	printf("main, ");
+      printf("%sactive, %s, %sline, %s%s",
+             CGDisplayIsActive(dspy) ? "" : "in",
+             CGDisplayIsAsleep(dspy) ? "asleep" : "awake",
+             CGDisplayIsOnline(dspy) ? "on" : "off",
+             CGDisplayIsBuiltin(dspy) ? "built-in" : "external",
+             CGDisplayIsStereo(dspy) ? ", stereo" : "");
+      printf(", ID 0x%x\n", (unsigned int)dspy);
       if (verbose) {
-	CFStringRef error = NULL;
-	CFPropertyListWriteToStream(originalMode, stdoutStream,
-				    kCFPropertyListXMLFormat_v1_0, &error);
-	if (error != NULL)
-	  errexit("failed to write display info (%s)",
-		  CFStringGetCStringPtr(error,
-					CFStringGetFastestEncoding(error)));
+        CGRect bounds = CGDisplayBounds(dspy);
+        printf("\tresolution %.0f x %.0f pt",
+               bounds.size.width, bounds.size.height);
+        if (CGDisplayModeGetPixelWidth != NULL) {
+          printf(" (%zu x %zu px)",
+                 CGDisplayModeGetPixelWidth(mode),
+                 CGDisplayModeGetPixelHeight(mode));
+        }
+        CGSize size = CGDisplayScreenSize(dspy);
+        printf(" @ %.1f Hz",
+               CGDisplayModeGetRefreshRate(mode));
+        printf(", origin (%.0f, %.0f)\n",
+               bounds.origin.x, bounds.origin.y);
+        printf("\tphysical size %.0f x %.0f mm\n",
+               size.width, size.height);
+        printf("\tIOKit flags 0x%x",
+               CGDisplayModeGetIOFlags(mode));
+        printf("; IOKit display mode ID 0x%x\n",
+               CGDisplayModeGetIODisplayModeID(mode));
+        CFStringRef pixelEncoding = CGDisplayModeCopyPixelEncoding(mode);
+        if (pixelEncoding != NULL) {
+          printf("\tpixel encoding %s\n",
+                 CFStringGetCStringPtr(pixelEncoding,
+                                       CFStringGetFastestEncoding(pixelEncoding)));
+          CFRelease(pixelEncoding);
+        }
+        CGSize mmSize = CGDisplayScreenSize(dspy);
+        double rotation = CGDisplayRotation(dspy);
+        if (CGDisplayIsInMirrorSet(dspy)) {
+          CGDirectDisplayID mirrorsDisplay = CGDisplayMirrorsDisplay(dspy);
+          if (mirrorsDisplay == kCGNullDirectDisplay)
+            printf("\tmirrored\n");
+          else
+            printf("\tmirrors display ID 0x%x\n", mirrorsDisplay);
+        }
+        printf("\t%susable for desktop GUI%s\n",
+               CGDisplayModeIsUsableForDesktopGUI(mode) ? "" : "not ",
+               CGDisplayUsesOpenGLAcceleration(dspy) ?
+               ", uses OpenGL acceleration" : "");
       }
     }
+    CGDisplayModeRelease(mode);
 
+    /* Deprecated on 10.9, but there's no replacement.
+       This will break when it breaks - file a bug if you care. */
     io_service_t service = CGDisplayIOServicePort(dspy);
     switch (action) {
     case ACTION_SET_ONE:
