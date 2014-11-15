@@ -88,7 +88,7 @@ int main(int argc, char * const argv[]) {
   CGDirectDisplayID display[kMaxDisplays];
   CGDisplayCount numDisplays;
   CGDisplayErr err;
-  err = CGGetActiveDisplayList(kMaxDisplays, display, &numDisplays);
+  err = CGGetOnlineDisplayList(kMaxDisplays, display, &numDisplays);
   if (err != CGDisplayNoErr)
     errexit("cannot get list of displays (error %d)\n", err);
 
