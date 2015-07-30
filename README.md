@@ -3,7 +3,25 @@ brightness
 
 Command-line display brightness control for OS X.
 
-These tools control the hardware brightness, where available.  If you can’t use the keyboard keys or Displays System Preferences to control your brightness, `brightness` isn’t going to help you.
+This tool enables programmatic control of OS X screen brightness. You can set and retrieve hardware brightness settings with this utility.
+
+Install with Homebrew
+--------------------
+
+```brew install brightness```
+
+Install From Source
+------------------
+
+```shell
+git clone https://github.com/nriley/brightness.git
+cd brightness
+make
+make install
+```
+
+OS X Version Support
+------------------
 
 Two versions are included.  Both require OS X 10.6 or later — but go back in the history and you’ll find versions that work with older OS X versions.
 
@@ -13,8 +31,15 @@ Two versions are included.  Both require OS X 10.6 or later — but go back in 
 
 Compilation instructions are in comments at the top of each file.
 
-Example
+Usage Examples
 -------
+
+Set 100% brightness: ```brightness 1```
+
+Set 50% brightness: ```brightness 0.5```
+
+Show current settings ```brightness -l```
+
 ````
 % brightness
 usage: brightness [-m|-d display] [-v] <brightness>
