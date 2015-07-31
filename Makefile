@@ -5,6 +5,8 @@
 
 prefix=/usr/local
 
+all: build
+
 build: brightness
 
 brightness: brightness.o
@@ -14,8 +16,9 @@ brightness: brightness.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(ARCH_FLAGS) $< -c -o $@
 
 clean:
-	rm -f brightness *.o
+	/bin/rm -f brightness *.o
 
 install:
-	mkdir -p $(prefix)/bin
-	install -s -m 0755 brightness $(prefix)/bin
+	/bin/mkdir -p $(prefix)/bin
+	/usr/bin/install -s -m 0755 brightness $(prefix)/bin
+
