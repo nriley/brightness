@@ -17,5 +17,9 @@ DerivedData
 *.hmap
 *.xccheckout
 
+# Make stuff
+brightness
+*.o
+
 #CocoaPods
 Pods
