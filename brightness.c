@@ -1,5 +1,3 @@
-/* clang -o brightness brightness.c -framework IOKit -framework ApplicationServices -Wl,-U,_CGDisplayModeGetPixelWidth -Wl,-U,_CGDisplayModeGetPixelHeight -mmacosx-version-min=10.6 */
-
 #include <stdio.h>
 #include <unistd.h>
 #include <IOKit/graphics/IOGraphicsLib.h>

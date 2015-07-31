@@ -1,16 +1,20 @@
 #!/usr/bin/env make -f
 # Makefile to build brightness
-# Friday November 1, 2013
-# Jon Stacey <jon@jonsview.com>
+# originally by Jon Stacey <jon@jonsview.com>
 
 prefix=/usr/local
+
+override CFLAGS += -mmacosx-version-min=10.6
 
 all: build
 
 build: brightness
 
 brightness: brightness.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(ARCH_FLAGS) -framework IOKit -framework ApplicationServices $^ -o $@
+	$(CC) $(CFLAGS) $(ARCH_FLAGS) -framework IOKit -framework ApplicationServices \
+		-Wl,-U,_CGDisplayModeGetPixelWidth \
+		-Wl,-U,_CGDisplayModeGetPixelHeight \
+		$^ -o $@
 
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(ARCH_FLAGS) $< -c -o $@
@@ -21,4 +25,3 @@ clean:
 install:
 	/bin/mkdir -p $(prefix)/bin
 	/usr/bin/install -s -m 0755 brightness $(prefix)/bin
-
