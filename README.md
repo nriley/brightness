@@ -17,7 +17,7 @@ Install From Source
 git clone https://github.com/nriley/brightness.git
 cd brightness
 make
-make install
+sudo make install
 ```
 
 OS X Version Support
