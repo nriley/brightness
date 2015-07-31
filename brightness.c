@@ -142,13 +142,6 @@ int main(int argc, char * const argv[]) {
                CGDisplayModeGetIOFlags(mode));
         printf("; IOKit display mode ID 0x%x\n",
                CGDisplayModeGetIODisplayModeID(mode));
-        CFStringRef pixelEncoding = CGDisplayModeCopyPixelEncoding(mode);
-        if (pixelEncoding != NULL) {
-          printf("\tpixel encoding %s\n",
-                 CFStringGetCStringPtr(pixelEncoding,
-                                       CFStringGetFastestEncoding(pixelEncoding)));
-          CFRelease(pixelEncoding);
-        }
         if (CGDisplayIsInMirrorSet(dspy)) {
           CGDirectDisplayID mirrorsDisplay = CGDisplayMirrorsDisplay(dspy);
           if (mirrorsDisplay == kCGNullDirectDisplay)
