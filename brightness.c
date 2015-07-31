@@ -28,6 +28,56 @@ static void usage() {
   exit(1);
 }
 
+static Boolean CFNumberEqualsUInt32(CFNumberRef number, uint32_t uint32) {
+  if (number == NULL)
+    return (uint32 == 0);
+
+  /* there's no CFNumber type guaranteed to be a uint32, so pick something bigger
+     that's guaranteed not to truncate */
+  int64_t int64;
+  if (!CFNumberGetValue(number, kCFNumberSInt64Type, &int64))
+    return false;
+
+  return (int64 == uint32);
+}
+
+/* CGDisplayIOServicePort is deprecated as of 10.9; try to match ourselves */
+static io_service_t CGDisplayGetIOServicePort(CGDirectDisplayID dspy) {
+  uint32_t vendor = CGDisplayVendorNumber(dspy);
+  uint32_t model = CGDisplayModelNumber(dspy); // == product ID
+  uint32_t serial = CGDisplaySerialNumber(dspy);
+
+  CFMutableDictionaryRef matching = IOServiceMatching("IODisplayConnect");
+
+  io_iterator_t iter;
+  if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter))
+    return 0;
+
+  io_service_t service, matching_service = 0;
+  while ( (service = IOIteratorNext(iter)) != 0) {
+    CFDictionaryRef info = IODisplayCreateInfoDictionary(service, kIODisplayNoProductName);
+
+    CFNumberRef vendorID = CFDictionaryGetValue(info, CFSTR(kDisplayVendorID));
+    CFNumberRef productID = CFDictionaryGetValue(info, CFSTR(kDisplayProductID));
+    CFNumberRef serialNumber = CFDictionaryGetValue(info, CFSTR(kDisplaySerialNumber));
+
+    if (CFNumberEqualsUInt32(vendorID, vendor) &&
+        CFNumberEqualsUInt32(productID, model) &&
+        CFNumberEqualsUInt32(serialNumber, serial)) {
+      matching_service = service;
+
+      CFRelease(info);
+      break;
+    }
+
+    CFRelease(info);
+  }
+
+  IOObjectRelease(iter);
+  return matching_service;
+}
+
+
 int main(int argc, char * const argv[]) {
   APP_NAME = argv[0];
   if (argc == 1)
@@ -157,9 +207,7 @@ int main(int argc, char * const argv[]) {
     }
     CGDisplayModeRelease(mode);
 
-    /* Deprecated on 10.9, but there's no replacement.
-       This will break when it breaks - file a bug if you care. */
-    io_service_t service = CGDisplayIOServicePort(dspy);
+    io_service_t service = CGDisplayGetIOServicePort(dspy);
     switch (action) {
     case ACTION_SET_ONE:
       if ((CGDirectDisplayID)displayToSet != dspy && displayToSet != i)
