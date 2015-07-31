@@ -13,7 +13,7 @@ const int kMaxDisplays = 16;
 const CFStringRef kDisplayBrightness = CFSTR(kIODisplayBrightnessKey);
 const char *APP_NAME;
 
-void errexit(const char *fmt, ...) {
+static void errexit(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   fprintf(stderr, "%s: ", APP_NAME);
@@ -22,7 +22,7 @@ void errexit(const char *fmt, ...) {
   exit(1);
 }
 
-void usage() {
+static void usage() {
   fprintf(stderr, "usage: %s [-m|-d display] [-v] <brightness>\n", APP_NAME);
   fprintf(stderr, "   or: %s -l [-v]\n", APP_NAME);
   exit(1);
