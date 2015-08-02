@@ -23,13 +23,11 @@ sudo make install
 OS X Version Support
 ------------------
 
-Two versions are included.  Both require OS X 10.6 or later — but go back in the history and you’ll find versions that work with older OS X versions.
+Two versions are included.  Both require OS X 10.6 or later — but go back in the commit history and you’ll find things compatible with older OS X versions.
 
-`brightness.c` uses documented APIs.  It works on internal laptop displays.  It doesn’t work on older Apple external LCDs.  I don’t know if it works on newer displays, such as Thunderbolt displays, because I don’t have any to test with.
+`brightness.c` — what you compile with the instructions above — uses documented APIs.  It works on internal laptop displays.  It doesn’t work on older Apple external LCDs which connect via DVI and USB.  I don’t know if it works on newer external displays, such as Thunderbolt displays, because I don’t have any to test with.  (Feedback welcome.)
 
-`brightness.m` uses SPIs reverse-engineered from Displays System Preferences as of 2005.  It does not work as of OS X 10.9, always returning 0 brightness, but does work on OS X 10.6.  (I do not have any plans to update it nor any hardware with which to test, but contributions are welcome.)
-
-Compilation instructions are in comments at the top of each file.
+`brightness.m` uses SPIs reverse-engineered from Displays System Preferences as of 2005.  It does not work as of OS X 10.9, always returning 0 brightness, but does work on Mac OS X 10.6.  (I do not have any plans to update it nor any hardware with which to test, but contributions are welcome.)  Compilation instructions are in a comment at the top of the file.
 
 Usage Examples
 -------
@@ -38,7 +36,7 @@ Set 100% brightness: ```brightness 1```
 
 Set 50% brightness: ```brightness 0.5```
 
-Show current settings: ```brightness -l```
+Show current brightness: ```brightness -l```
 
 ````
 % brightness
