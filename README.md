@@ -6,7 +6,7 @@ Command-line display brightness control for macOS.
 This tool enables programmatic control of macOS screen brightness. You can set and retrieve hardware brightness settings with this utility.
 
 <table><tr><th>
-	Please note that if you cannot control your display’s brightness from Displays System Preferences, you will not be able to do it with `brightness`. See <a href="https://github.com/nriley/brightness/issues/11">this issue</a> for more information and some potential other options.
+	Please note that if you cannot control your display’s brightness from Displays System Preferences, you will not be able to do it with <tt>brightness</tt>. See <a href="https://github.com/nriley/brightness/issues/11">this issue</a> for more information and some potential other options.
 </th></tr></table>
 
 Install with Homebrew
