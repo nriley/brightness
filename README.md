@@ -6,7 +6,7 @@ Command-line display brightness control for macOS.
 This tool enables you to set and obtain the brightness level of all internal and certain external displays from the command line or a script.
 
 <table><tr><th>
-	Please note that if you cannot control your display’s brightness from Displays System Preferences, you will not be able to do it with <tt>brightness</tt>. Users also report incompatibility with the LG UltraFine displays. See <a href="https://github.com/nriley/brightness/issues/11">this issue</a> for more information and some potential other options.
+If you cannot control your display’s brightness from Displays System Preferences, you will not be able to do it with <tt>brightness</tt>. LG UltraFine displays are also reportedly incompatible. See <a href="https://github.com/nriley/brightness/issues/11">this issue</a> for more information and some potential other options.
 </th></tr></table>
 
 Install with Homebrew
