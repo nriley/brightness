@@ -6,7 +6,7 @@ Command-line display brightness control for macOS.
 This tool enables you to set and obtain the brightness level of all internal and certain external displays from the command line or a script.
 
 <table><tr><th>
-If you cannot control your display’s brightness from Displays System Preferences, you will not be able to do it with <tt>brightness</tt>. LG UltraFine displays are also reportedly incompatible. See <a href="https://github.com/nriley/brightness/issues/11">this issue</a> for more information and some potential other options.
+If you cannot control your display’s brightness from Displays System Preferences, you will not be able to do it with <tt>brightness</tt>. See <a href="https://github.com/nriley/brightness/issues/11">this issue</a> for more information and some potential other options.
 </th></tr></table>
 
 Install with Homebrew
@@ -27,11 +27,11 @@ sudo make install
 macOS Version Support
 ---------------------
 
-Two versions are included.  Both require OS X 10.6 or later — but go back in the commit history and you’ll find things compatible with older OS X versions.
+`brightness` requires OS X/macOS 10.8 or later — but go back in the commit history and you’ll find code compatible with older (Mac) OS X versions.
 
-`brightness.c` — what you compile with the instructions above — uses documented APIs.  It works on internal laptop displays.  It doesn’t work on older Apple external LCDs which connect via DVI and USB.  I don’t know if it works on newer external displays, such as Thunderbolt displays, because I don’t have any to test with.  (Feedback welcome.)
+Through macOS 10.12.3, `brightness` uses documented APIs.  It works on internal laptop displays.  It doesn’t work on older Apple external LCDs which connect via DVI and USB.  I don’t know if it works on newer external displays, such as Thunderbolt displays, because I don’t have any to test with.  (Feedback welcome.)
 
-`brightness.m` uses SPIs reverse-engineered from Displays System Preferences as of 2005.  It does not work as of OS X 10.9, always returning 0 brightness, but does work on Mac OS X 10.6.  (I do not have any plans to update it nor any hardware with which to test, but contributions are welcome.)  Compilation instructions are in a comment at the top of the file.
+As of macOS 10.12.4 with the introduction of Night Shift, the documented APIs fail to work correctly and Apple does not provide replacement APIs.  Therefore, `brightness` uses an [undocumented method](https://github.com/nriley/brightness/issues/21) to adjust brightness.
 
 Usage Examples
 -------

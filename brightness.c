@@ -3,10 +3,17 @@
 #include <IOKit/graphics/IOGraphicsLib.h>
 #include <ApplicationServices/ApplicationServices.h>
 
-/* 10.8+ */
-extern size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef mode)
-  __attribute__((weak_import));
-extern size_t CGDisplayModeGetPixelHeight(CGDisplayModeRef mode)
+/* As of macOS 10.12.4, brightness set by public IOKit API is
+   overridden by CoreDisplay's brightness (to support Night Shift).
+
+   The below function in CoreDisplay seems to work to adjust the
+   "user" brightness (like dragging the slider in System Preferences
+   or using function keys).  This symbol is listed in the .tbd file in
+   CoreDisplay.framework so it is at least more "public" than a symbol
+   in a private framework, though there are no public headers
+   distributed for this framework. */
+extern void CoreDisplay_Display_SetUserBrightness(CGDirectDisplayID id,
+                                                  double brightness)
   __attribute__((weak_import));
 
 const int kMaxDisplays = 16;
@@ -32,8 +39,8 @@ static Boolean CFNumberEqualsUInt32(CFNumberRef number, uint32_t uint32) {
   if (number == NULL)
     return (uint32 == 0);
 
-  /* there's no CFNumber type guaranteed to be a uint32, so pick something bigger
-     that's guaranteed not to truncate */
+  /* there's no CFNumber type guaranteed to be a uint32, so pick
+     something bigger that's guaranteed not to truncate */
   int64_t int64;
   if (!CFNumberGetValue(number, kCFNumberSInt64Type, &int64))
     return false;
@@ -84,7 +91,7 @@ int main(int argc, char * const argv[]) {
     usage();
 
   int verbose = 0;
-  unsigned long displayToSet = 0;
+  CGDirectDisplayID displayToSet = 0;
   enum { ACTION_LIST, ACTION_SET_ALL, ACTION_SET_ONE } action = ACTION_SET_ALL;
   extern char *optarg;
   extern int optind;
@@ -102,7 +109,7 @@ int main(int argc, char * const argv[]) {
     case 'm':
       if (action != ACTION_SET_ALL) usage();
       action = ACTION_SET_ONE;
-      displayToSet = (unsigned long)CGMainDisplayID();
+      displayToSet = CGMainDisplayID();
       break;
     case 'd':
       if (action != ACTION_SET_ALL) usage();
@@ -173,13 +180,12 @@ int main(int argc, char * const argv[]) {
         CGRect bounds = CGDisplayBounds(dspy);
         printf("\tresolution %.0f x %.0f pt",
                bounds.size.width, bounds.size.height);
-        if (CGDisplayModeGetPixelWidth != NULL) {
-          printf(" (%zu x %zu px)",
-                 CGDisplayModeGetPixelWidth(mode),
-                 CGDisplayModeGetPixelHeight(mode));
-        }
-        printf(" @ %.1f Hz",
-               CGDisplayModeGetRefreshRate(mode));
+        printf(" (%zu x %zu px)",
+               CGDisplayModeGetPixelWidth(mode),
+               CGDisplayModeGetPixelHeight(mode));
+        double refreshRate = CGDisplayModeGetRefreshRate(mode);
+        if (refreshRate != 0)
+          printf(" @ %.1f Hz", refreshRate);
         printf(", origin (%.0f, %.0f)\n",
                bounds.origin.x, bounds.origin.y);
         CGSize size = CGDisplayScreenSize(dspy);
@@ -210,16 +216,20 @@ int main(int argc, char * const argv[]) {
     io_service_t service = CGDisplayGetIOServicePort(dspy);
     switch (action) {
     case ACTION_SET_ONE:
-      if ((CGDirectDisplayID)displayToSet != dspy && displayToSet != i)
+      if (displayToSet != dspy && displayToSet != i)
 	continue;
     case ACTION_SET_ALL:
-      err = IODisplaySetFloatParameter(service, kNilOptions, kDisplayBrightness,
-				       brightness);
-      if (err != kIOReturnSuccess) {
-	fprintf(stderr,
-		"%s: failed to set brightness of display 0x%x (error %d)\n",
-		APP_NAME, (unsigned int)dspy, err);
-	continue;
+      if (CoreDisplay_Display_SetUserBrightness != NULL) { /* prefer SPI */
+        CoreDisplay_Display_SetUserBrightness(displayToSet, brightness);
+      } else {
+        err = IODisplaySetFloatParameter(service, kNilOptions,
+                                         kDisplayBrightness, brightness);
+        if (err != kIOReturnSuccess) {
+          fprintf(stderr,
+                  "%s: failed to set brightness of display 0x%x (error %d)\n",
+                  APP_NAME, (unsigned int)dspy, err);
+          continue;
+        }
       }
       if (!verbose) continue;
     case ACTION_LIST:

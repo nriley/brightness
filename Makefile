@@ -4,16 +4,18 @@
 
 prefix=/usr/local
 
-override CFLAGS += -mmacosx-version-min=10.6
+override CFLAGS += -mmacosx-version-min=10.8
 
 all: build
 
 build: brightness
 
 brightness: brightness.o
-	$(CC) $(CFLAGS) $(ARCH_FLAGS) -framework IOKit -framework ApplicationServices \
-		-Wl,-U,_CGDisplayModeGetPixelWidth \
-		-Wl,-U,_CGDisplayModeGetPixelHeight \
+	$(CC) $(CFLAGS) $(ARCH_FLAGS) \
+		-framework IOKit \
+		-framework ApplicationServices \
+		-framework CoreDisplay \
+		-Wl,-U,_CoreDisplay_Display_SetUserBrightness \
 		$^ -o $@
 
 %.o: %.c
