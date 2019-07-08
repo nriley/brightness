@@ -4,16 +4,39 @@
 #include <ApplicationServices/ApplicationServices.h>
 
 /* As of macOS 10.12.4, brightness set by public IOKit API is
-   overridden by CoreDisplay's brightness (to support Night Shift).
+   overridden by CoreDisplay's brightness (to support Night Shift). In
+   addition, using CoreDisplay to get brightness supports additional
+   display types, e.g. the 2015 iMac's internal display.
 
-   The below function in CoreDisplay seems to work to adjust the
+   The below functions in CoreDisplay seem to work to adjust the
    "user" brightness (like dragging the slider in System Preferences
-   or using function keys).  This symbol is listed in the .tbd file in
-   CoreDisplay.framework so it is at least more "public" than a symbol
-   in a private framework, though there are no public headers
+   or using function keys).  The symbols below are listed in the .tbd
+   file in CoreDisplay.framework so it is at least more "public" than
+   a symbol in a private framework, though there are no public headers
    distributed for this framework. */
+extern double CoreDisplay_Display_GetUserBrightness(CGDirectDisplayID id)
+  __attribute__((weak_import));
 extern void CoreDisplay_Display_SetUserBrightness(CGDirectDisplayID id,
                                                   double brightness)
+  __attribute__((weak_import));
+
+/* Some issues with the above CoreDisplay functions include:
+
+   - There's no way to tell if setting the brightness was successful
+
+   - There's no way to tell if a brightness of 1 means that the
+     brightness is actually 1, or if there's no adjustable brightness
+
+   - Brightness changes aren't reflected in System Preferences
+     immediately
+
+   Fixing these means using the private DisplayServices.framework.  Be
+   even more careful about these.
+*/
+extern _Bool DisplayServicesCanChangeBrightness(CGDirectDisplayID id)
+  __attribute__((weak_import));
+extern void DisplayServicesBrightnessChanged(CGDirectDisplayID id,
+                                             double brightness)
   __attribute__((weak_import));
 
 const int kMaxDisplays = 16;
@@ -220,7 +243,18 @@ int main(int argc, char * const argv[]) {
 	continue;
     case ACTION_SET_ALL:
       if (CoreDisplay_Display_SetUserBrightness != NULL) { /* prefer SPI */
-        CoreDisplay_Display_SetUserBrightness(displayToSet, brightness);
+        if (DisplayServicesCanChangeBrightness != NULL) {
+          if (!DisplayServicesCanChangeBrightness(dspy)) {
+            fprintf(stderr,
+                    "%s: failed to set brightness of display 0x%x\n",
+                    APP_NAME, (unsigned int)dspy);
+            continue;
+          }
+        }
+        CoreDisplay_Display_SetUserBrightness(dspy, brightness);
+        if (DisplayServicesBrightnessChanged != NULL) {
+          DisplayServicesBrightnessChanged(dspy, brightness);
+        }
       } else {
         err = IODisplaySetFloatParameter(service, kNilOptions,
                                          kDisplayBrightness, brightness);
@@ -233,13 +267,25 @@ int main(int argc, char * const argv[]) {
       }
       if (!verbose) continue;
     case ACTION_LIST:
-      err = IODisplayGetFloatParameter(service, kNilOptions, kDisplayBrightness,
-				       &brightness);
-      if (err != kIOReturnSuccess) {
-	fprintf(stderr,
-		"%s: failed to get brightness of display 0x%x (error %d)\n",
-		APP_NAME, (unsigned int)dspy, err);
-	continue;
+      if (CoreDisplay_Display_GetUserBrightness != NULL) { /* prefer SPI */
+        if (DisplayServicesCanChangeBrightness != NULL) {
+          if (!DisplayServicesCanChangeBrightness(dspy)) {
+            fprintf(stderr,
+                    "%s: failed to get brightness of display 0x%x\n",
+                    APP_NAME, (unsigned int)dspy);
+            continue;
+          }
+        }
+        brightness = CoreDisplay_Display_GetUserBrightness(dspy);
+      } else {
+        err = IODisplayGetFloatParameter(service, kNilOptions,
+                                         kDisplayBrightness, &brightness);
+        if (err != kIOReturnSuccess) {
+          fprintf(stderr,
+                  "%s: failed to get brightness of display 0x%x (error %d)\n",
+                  APP_NAME, (unsigned int)dspy, err);
+          continue;
+        }
       }
       printf("display %d: brightness %f\n", i, brightness);
     }
