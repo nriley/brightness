@@ -30,6 +30,8 @@ extern void CoreDisplay_Display_SetUserBrightness(CGDirectDisplayID id,
    - Brightness changes aren't reflected in System Preferences
      immediately
 
+   - They don't work on M1 Macs running Big Sur.
+
    Fixing these means using the private DisplayServices.framework.  Be
    even more careful about these.
 */
@@ -37,6 +39,12 @@ extern _Bool DisplayServicesCanChangeBrightness(CGDirectDisplayID id)
   __attribute__((weak_import));
 extern void DisplayServicesBrightnessChanged(CGDirectDisplayID id,
                                              double brightness)
+  __attribute__((weak_import));
+extern int DisplayServicesGetBrightness(CGDirectDisplayID id,
+                                        float *brightness)
+  __attribute__((weak_import));
+extern int DisplayServicesSetBrightness(CGDirectDisplayID id,
+                                        float brightness)
   __attribute__((weak_import));
 
 const int kMaxDisplays = 16;
@@ -52,6 +60,7 @@ static void errexit(const char *fmt, ...) {
   exit(1);
 }
 
+__attribute__((noreturn))
 static void usage() {
   fprintf(stderr, "usage: %s [-m|-d display] [-v] <brightness>\n", APP_NAME);
   fprintf(stderr, "   or: %s -l [-v]\n", APP_NAME);
@@ -107,6 +116,78 @@ static io_service_t CGDisplayGetIOServicePort(CGDirectDisplayID dspy) {
   return matching_service;
 }
 
+static Boolean setBrightness(CGDirectDisplayID dspy, io_service_t service, float brightness) {
+  /* prefer SPI */
+  Boolean hasSPI = DisplayServicesGetBrightness != NULL || CoreDisplay_Display_GetUserBrightness != NULL;
+  if (hasSPI) {
+    Boolean canChangeBrightness = DisplayServicesCanChangeBrightness == NULL || DisplayServicesCanChangeBrightness(dspy);
+    if (canChangeBrightness) {
+      if (DisplayServicesSetBrightness != NULL) {
+        if (DisplayServicesSetBrightness(dspy, brightness) == 0) {
+          return true;
+        }
+      }
+
+      if (CoreDisplay_Display_SetUserBrightness != NULL) {
+        CoreDisplay_Display_SetUserBrightness(dspy, brightness);
+        if (DisplayServicesBrightnessChanged != NULL) {
+          DisplayServicesBrightnessChanged(dspy, brightness);
+        }
+        return true;
+      }
+    }
+
+    fprintf(stderr,
+            "%s: failed to set brightness of display 0x%x\n",
+            APP_NAME, (unsigned int)dspy);
+    return false;
+  }
+
+  IOReturn err = IODisplaySetFloatParameter(service, kNilOptions,
+                                   kDisplayBrightness, brightness);
+  if (err != kIOReturnSuccess) {
+    fprintf(stderr,
+            "%s: failed to set brightness of display 0x%x (error %d)\n",
+            APP_NAME, (unsigned int)dspy, err);
+    return false;
+  }
+  return true;
+}
+
+static Boolean getBrightness(CGDirectDisplayID dspy, io_service_t service, float *brightness) {
+  /* prefer SPI */
+  Boolean hasSPI = DisplayServicesGetBrightness != NULL || CoreDisplay_Display_GetUserBrightness != NULL;
+  if (hasSPI) {
+    Boolean canChangeBrightness = DisplayServicesCanChangeBrightness == NULL || DisplayServicesCanChangeBrightness(dspy);
+    if (canChangeBrightness) {
+      if (DisplayServicesGetBrightness != NULL) {
+        if (DisplayServicesGetBrightness(dspy, brightness) == 0) {
+          return true;
+        }
+      }
+
+      if (CoreDisplay_Display_GetUserBrightness != NULL) {
+        *brightness = CoreDisplay_Display_GetUserBrightness(dspy);
+        return true;
+      }
+    }
+    fprintf(stderr,
+            "%s: failed to get brightness of display 0x%x\n",
+            APP_NAME, (unsigned int)dspy);
+    return false;
+  }
+
+  IOReturn err = IODisplayGetFloatParameter(service, kNilOptions,
+                                            kDisplayBrightness, brightness);
+  if (err != kIOReturnSuccess) {
+    fprintf(stderr,
+            "%s: failed to get brightness of display 0x%x (error %d)\n",
+            APP_NAME, (unsigned int)dspy, err);
+    return false;
+  }
+  return true;
+}
+
 
 int main(int argc, char * const argv[]) {
   APP_NAME = argv[0];
@@ -151,7 +232,7 @@ int main(int argc, char * const argv[]) {
 
   float brightness;
   if (action == ACTION_LIST) {
-    if (argc > 0) usage();
+    usage();
   } else {
     if (argc != 1) usage();
 
@@ -242,50 +323,13 @@ int main(int argc, char * const argv[]) {
       if (displayToSet != dspy && displayToSet != i)
 	continue;
     case ACTION_SET_ALL:
-      if (CoreDisplay_Display_SetUserBrightness != NULL) { /* prefer SPI */
-        if (DisplayServicesCanChangeBrightness != NULL) {
-          if (!DisplayServicesCanChangeBrightness(dspy)) {
-            fprintf(stderr,
-                    "%s: failed to set brightness of display 0x%x\n",
-                    APP_NAME, (unsigned int)dspy);
-            continue;
-          }
-        }
-        CoreDisplay_Display_SetUserBrightness(dspy, brightness);
-        if (DisplayServicesBrightnessChanged != NULL) {
-          DisplayServicesBrightnessChanged(dspy, brightness);
-        }
-      } else {
-        err = IODisplaySetFloatParameter(service, kNilOptions,
-                                         kDisplayBrightness, brightness);
-        if (err != kIOReturnSuccess) {
-          fprintf(stderr,
-                  "%s: failed to set brightness of display 0x%x (error %d)\n",
-                  APP_NAME, (unsigned int)dspy, err);
-          continue;
-        }
+      if (!setBrightness(dspy, service, brightness)) {
+        continue;
       }
       if (!verbose) continue;
     case ACTION_LIST:
-      if (CoreDisplay_Display_GetUserBrightness != NULL) { /* prefer SPI */
-        if (DisplayServicesCanChangeBrightness != NULL) {
-          if (!DisplayServicesCanChangeBrightness(dspy)) {
-            fprintf(stderr,
-                    "%s: failed to get brightness of display 0x%x\n",
-                    APP_NAME, (unsigned int)dspy);
-            continue;
-          }
-        }
-        brightness = CoreDisplay_Display_GetUserBrightness(dspy);
-      } else {
-        err = IODisplayGetFloatParameter(service, kNilOptions,
-                                         kDisplayBrightness, &brightness);
-        if (err != kIOReturnSuccess) {
-          fprintf(stderr,
-                  "%s: failed to get brightness of display 0x%x (error %d)\n",
-                  APP_NAME, (unsigned int)dspy, err);
-          continue;
-        }
+      if (!getBrightness(dspy, service, &brightness)) {
+        continue;
       }
       printf("display %d: brightness %f\n", i, brightness);
     }
